@@ -65,7 +65,7 @@ sudo sh -c "genfstab -U ${TMP_ROOT} >> ${TMP_ROOT}/etc/fstab"
 sudo sed -i '/swap/d' ${TMP_ROOT}/etc/fstab
 sudo sed -i '$ d' ${TMP_ROOT}/etc/fstab
 if [ "$MAKE_SWAP_PARTITION" = true ] ; then
-  SWAP_UUID=$(lsblk -n -b -o PARTUUID ${LOOPDEV}p3)
+  SWAP_UUID=$(lsblk -n -b -o UUID ${LOOPDEV}p3)
   sudo sed -i '$a #swap' ${TMP_ROOT}/etc/fstab
   sudo sed -i '$a UUID='${SWAP_UUID}'	none      	swap      	defaults  	0 0' ${TMP_ROOT}/etc/fstab
 fi
@@ -118,7 +118,7 @@ grub-install --target=i386-pc --recheck --debug ${LOOPDEV}
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "$ROOT_FS_TYPE" = "f2fs" ] ; then
-  ROOT_UUID=$(lsblk -n -b -o PARTUUID ${LOOPDEV}p${NEXT_PARTITION})
+  ROOT_UUID=$(lsblk -n -b -o UUID ${LOOPDEV}p${NEXT_PARTITION})
   sed -i 's,root=/dev/.*,root=UUID='\$ROOT_UUID' rw,g' /boot/grub/grub.cfg
 fi
 
