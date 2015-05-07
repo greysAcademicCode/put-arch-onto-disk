@@ -137,7 +137,8 @@ sync
 if [ "$DD_TO_TARGET" = true ] ; then
   sudo dd if="${IMG_NAME}" of=${TARGET_DISK} bs=1M
   sync
-  sudo partprobe ${TARGET_DISK}
+  sudo sgdisk -e ${TARGET_DISK}
+  sudo sgdisk -v ${TARGET_DISK}
 fi
 
 if [ "$CLEAN_UP" = true ] ; then
