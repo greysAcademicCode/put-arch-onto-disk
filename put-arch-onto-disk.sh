@@ -24,7 +24,7 @@ set -vx #echo on
 : ${CLEAN_UP:=false}
 : ${ENABLE_AUR:=true}
 
-rm "${IMG_NAME}"
+rm -f "${IMG_NAME}"
 if [ "$USE_TARGET_DISK" = true ] ; then
   DISK_INFO=$(lsblk -n -b -o SIZE,PHY-SEC ${TARGET_DISK})
   IFS=' ' read -a DISK_INFO_A <<< "$DISK_INFO"
@@ -114,15 +114,17 @@ if [[ \$INSTALLED_PACKAGES == *"bcache-tools"* ]] ; then
   sed -i 's/HOOKS="base udev autodetect modconf block/HOOKS="base udev autodetect modconf block bcache/g' /etc/mkinitcpio.conf
 fi
 mkinitcpio -p linux
-grub-install --target=i386-pc --recheck --debug ${LOOPDEV}
+grub-install --modules=part_gpt --target=i386-pc --recheck --debug ${LOOPDEV}
 grub-mkconfig -o /boot/grub/grub.cfg
 
 if [ "$ROOT_FS_TYPE" = "f2fs" ] ; then
   ROOT_UUID=$(lsblk -n -b -o UUID ${LOOPDEV}p${NEXT_PARTITION})
-  sed -i 's,root=/dev/.*,root=UUID='\$ROOT_UUID' rw,g' /boot/grub/grub.cfg
+  sed -i 's,root=${LOOPDEV}p${NEXT_PARTITION},root=UUID='\$ROOT_UUID',g' /boot/grub/grub.cfg
 fi
-
 EOF
+if [ "$DD_TO_TARGET" = true ] ; then
+  sudo wipefs -a ${TARGET_DISK}
+fi
 chmod +x /tmp/chroot.sh
 sudo mv /tmp/chroot.sh ${TMP_ROOT}/root/chroot.sh
 sudo arch-chroot ${TMP_ROOT} /root/chroot.sh
@@ -133,7 +135,6 @@ sudo umount ${TMP_ROOT}/boot
 sudo umount ${TMP_ROOT}
 sudo losetup -D
 sync
-
 if [ "$DD_TO_TARGET" = true ] ; then
   sudo dd if="${IMG_NAME}" of=${TARGET_DISK} bs=1M
   sync
