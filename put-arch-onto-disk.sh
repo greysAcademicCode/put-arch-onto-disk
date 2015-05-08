@@ -23,6 +23,7 @@ set -vx #echo on
 : ${DD_TO_TARGET:=false}
 : ${CLEAN_UP:=false}
 : ${ENABLE_AUR:=true}
+: ${TARGET_IS_REMOVABLE:=false}
 
 rm -f "${IMG_NAME}"
 if [ "$USE_TARGET_DISK" = true ] ; then
@@ -50,8 +51,12 @@ LOOPDEV=$(sudo losetup --find)
 sudo losetup -P ${LOOPDEV} "${IMG_NAME}"
 sudo wipefs -a -f ${LOOPDEV}p2
 sudo mkfs.ext4 -L ext4Boot ${LOOPDEV}p2
+sudo wipefs -a -f ${LOOPDEV}p3
+if [ "$MAKE_SWAP_PARTITION" = true ] ; then
+  sudo mkswap -L swap ${LOOPDEV}p3
+  sudo wipefs -a -f ${LOOPDEV}p4
+fi
 ELL=L
-sudo wipefs -a -f ${LOOPDEV}p${NEXT_PARTITION}
 [ "$ROOT_FS_TYPE" = "f2fs" ] && ELL=l
 sudo mkfs.${ROOT_FS_TYPE} -${ELL} ${ROOT_FS_TYPE}Root ${LOOPDEV}p${NEXT_PARTITION}
 sgdisk -p "${IMG_NAME}"
@@ -63,7 +68,6 @@ sudo mount -text4 ${LOOPDEV}p2 ${TMP_ROOT}/boot
 sudo pacstrap ${TMP_ROOT} base grub ${PACKAGE_LIST}
 sudo sh -c "genfstab -U ${TMP_ROOT} >> ${TMP_ROOT}/etc/fstab"
 sudo sed -i '/swap/d' ${TMP_ROOT}/etc/fstab
-sudo sed -i '$ d' ${TMP_ROOT}/etc/fstab
 if [ "$MAKE_SWAP_PARTITION" = true ] ; then
   SWAP_UUID=$(lsblk -n -b -o UUID ${LOOPDEV}p3)
   sudo sed -i '$a #swap' ${TMP_ROOT}/etc/fstab
@@ -86,10 +90,14 @@ if [ "$MAKE_ADMIN_USER" = true ] ; then
   useradd -m -G wheel -s /bin/bash ${ADMIN_USER_NAME}
   echo "${ADMIN_USER_NAME}:${ADMIN_USER_PASSWORD}"|chpasswd
   pacman -S --needed --noconfirm sudo
+  sed -i 's/# %wheel ALL=(ALL) NOPASSWD: ALL/## %wheel ALL=(ALL) NOPASSWD: ALL/g' /etc/sudoers
   sed -i 's/# %wheel ALL=(ALL)/%wheel ALL=(ALL)/g' /etc/sudoers
 fi
 if [ "$ROOT_FS_TYPE" = "f2fs" ] ; then
   pacman -S --needed --noconfirm f2fs-tools
+fi
+if [ "$ROOT_FS_TYPE" = "btrfs" ] ; then
+  pacman -S --needed --noconfirm btrfs-progs
 fi
 if [ "$ENABLE_AUR" = true ] ; then
   echo "[archlinuxfr]" >> /etc/pacman.conf
@@ -123,6 +131,7 @@ if [ "$ROOT_FS_TYPE" = "f2fs" ] ; then
 fi
 EOF
 if [ "$DD_TO_TARGET" = true ] ; then
+  for n in ${TARGET_DISK}* ; do sudo umount $n || true; done
   sudo wipefs -a ${TARGET_DISK}
 fi
 chmod +x /tmp/chroot.sh
@@ -136,10 +145,7 @@ sudo umount ${TMP_ROOT}
 sudo losetup -D
 sync
 if [ "$DD_TO_TARGET" = true ] ; then
-  sudo dd if="${IMG_NAME}" of=${TARGET_DISK} bs=1M
-  sync
-  sudo sgdisk -e ${TARGET_DISK}
-  sudo sgdisk -v ${TARGET_DISK}
+  sudo -E bash -c 'dd if='"${IMG_NAME}"' of='${TARGET_DISK}' bs=1M; sync; sgdisk -e '${TARGET_DISK}'; sgdisk -v '${TARGET_DISK}'; [ '"$TARGET_IS_REMOVABLE"' = true ] && eject '${TARGET_DISK}
 fi
 
 if [ "$CLEAN_UP" = true ] ; then
