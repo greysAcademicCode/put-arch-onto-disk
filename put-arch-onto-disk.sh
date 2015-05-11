@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e #break on error
 set -vx #echo on
+THIS="$( cd "$(dirname "$0")" ; pwd -P )"/$(basename $0)
 
 : ${ROOT_FS_TYPE:=f2fs}
 : ${MAKE_SWAP_PARTITION:=false}
@@ -169,7 +170,7 @@ chmod +x /tmp/chroot.sh
 sudo mv /tmp/chroot.sh ${TMP_ROOT}/root/chroot.sh
 sudo arch-chroot ${TMP_ROOT} /root/chroot.sh
 sudo rm ${TMP_ROOT}/root/chroot.sh
-
+sudo cp "$THIS" /usr/sbin/mkarch.sh
 sync && sudo umount ${TMP_ROOT}/boot && sudo umount ${TMP_ROOT} && sudo losetup -D && sync && echo "Image sucessfully created"
 if [ "$DD_TO_TARGET" = true ] ; then
   echo "Writing image to disk..."
